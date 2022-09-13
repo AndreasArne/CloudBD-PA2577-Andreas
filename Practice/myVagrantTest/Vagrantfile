@@ -1,0 +1,58 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+require './puppet_deps'
+
+nodes = [
+  { :hostname => 'web', :ip => '192.168.0.42', :box => 'bento/ubuntu-18.04', :portfrom => '80', :portto => '8082',
+    :modules => ["puppet-nginx:2.1.1", "puppetlabs-apt:7.7.1"]
+  },
+  { :hostname => 'appserver', :ip => '192.168.0.43', :box => 'bento/ubuntu-18.04', :modules => []},
+  { :hostname => 'dbserver',  :ip => '192.168.0.44', :box => 'bento/ubuntu-18.04',
+    :modules => ["puppetlabs-mysql:10.10.0"]
+  }
+  # { :hostname => 'tt0',  :ip => '192.168.0.44', :box => 'bento/ubuntu-18.04'},
+  # { :hostname => 'tst1',  :ip => '192.168.0.44', :box => 'bento/ubuntu-18.04'},
+  # { :hostname => 'tst2',  :ip => '192.168.0.44', :box => 'bento/ubuntu-18.04'},
+]
+
+Vagrant.configure("2") do |config|
+  nodes.each do |node|
+    config.vm.define node[:hostname] do |nodeconfig|
+      nodeconfig.vm.box = node[:box]
+      nodeconfig.vm.hostname = node[:hostname] + ".box"
+      # nodeconfig.vm.network :private_network, ip: node[:ip]
+      if (node[:portfrom]) then
+        nodeconfig.vm.network "forwarded_port", guest: node[:portfrom], host: node[:portto]
+      end
+
+      # config.vm.provision "install_puppet", type: "shell", inline: <<-SHELL
+      # wget https://apt.puppetlabs.com/puppet5-release-$(lsb_release -cs).deb
+      # dpkg -i puppet5-release-$(lsb_release -cs).deb
+      # apt-get -qq update
+      # apt-get install -y puppet-agent
+      # SHELL
+
+      nodeconfig.vm.provision "install_modules", before:"all", run:"always", type:"shell", path: "./puppet_modules.sh", args: node[:modules].join(" ")
+    end
+  end
+
+
+  config.vm.provision :puppet do |puppet|
+    puppet.manifests_path = "./environments/test/manifests"
+    puppet.manifest_file = "default.pp"
+    puppet.module_path = "./environments/test/modules"
+  end
+end
+
+
+
+    # ändra till nodeconfig? ger error att nodeconfig inte finns - behöver ligga inne i nodeconfig loopen ovanför
+
+    # if (node[:hostname] == "web") then
+      # config.vm.provision after: "install_puppet", type:"shell", inline: install_dep('puppet-nginx', '2.1.1')
+      # config.vm.provision after: "install_puppet", type:"shell", inline: install_dep('puppetlabs-apt', '7.7.1')
+    # end
+    # if (node[:hostname] == "dbserver") then
+    #   config.vm.provision after: "install_puppet", type:"shell", inline: install_dep('puppetlabs-mysql', '10.10.0')
+    # end
